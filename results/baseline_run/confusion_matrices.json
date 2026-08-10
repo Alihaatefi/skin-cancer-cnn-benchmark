@@ -1,0 +1,61 @@
+{
+  "_comment": [
+    "Confusion matrices from the single-split baseline run described in",
+    "docs/RESULTS.md. Rows are the true class, columns the predicted class, in the",
+    "order [benign, malignant]. The decision rule was argmax over the two output",
+    "units; no probability scores were retained from this run, which is why the",
+    "baseline table carries no ROC-AUC and why the benchmark harness now persists",
+    "per-image scores to results/<name>/test_scores.npy."
+  ],
+  "protocol": {
+    "split": "dataset's own Training/Testing directories, no cross-validation",
+    "n_train": 84,
+    "n_test": 204,
+    "test_class_counts": { "benign": 162, "malignant": 42 },
+    "input_size": [224, 224],
+    "batch_size": 16,
+    "optimizer": "Adam",
+    "decision_rule": "argmax",
+    "hardware": "NVIDIA RTX 3050 Ti (laptop)"
+  },
+  "models": {
+    "inceptionv3": {
+      "display_name": "GoogLeNet (Inception-v3)",
+      "epochs": 30,
+      "weights": "ImageNet, backbone frozen",
+      "train_seconds": 111,
+      "matrix": [[93, 69], [1, 41]]
+    },
+    "efficientnetb0": {
+      "display_name": "EfficientNet-B0",
+      "epochs": 30,
+      "weights": "ImageNet, backbone frozen",
+      "train_seconds": 84,
+      "matrix": [[137, 25], [11, 31]]
+    },
+    "alexnet": {
+      "display_name": "AlexNet",
+      "epochs": 100,
+      "weights": "random initialisation",
+      "train_seconds": 160,
+      "matrix": [[97, 65], [20, 22]]
+    }
+  },
+  "reference_paper": {
+    "_comment": [
+      "Published accuracies from Surendren & Sumitha, ICDICI 2024 (DOI",
+      "10.1109/ICDICI62993.2024.10810998), listed as context only. They come from a",
+      "different split of a larger dataset (2,367 train / 660 test) under an",
+      "unstated protocol, so they are not directly comparable to the numbers above."
+    ],
+    "citation": "Surendren D. and Sumitha J., ICDICI 2024, pp. 1254-1258",
+    "n_train": 2367,
+    "n_test": 660,
+    "accuracy": {
+      "vgg16": 0.7261,
+      "vgg19": 0.7319,
+      "resnet50": 0.8237,
+      "densenet121": 0.8435
+    }
+  }
+}

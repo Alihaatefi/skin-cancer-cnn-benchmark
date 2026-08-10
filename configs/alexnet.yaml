@@ -1,0 +1,44 @@
+# AlexNet (2012) -- trained from scratch; the pre-transfer-learning baseline
+#
+# Protocol is identical across every config in this directory; only `model` changes.
+# That is the point of the benchmark: a difference in the table has to come from the
+# backbone, not from a different learning rate or a different number of epochs.
+name: alexnet
+seed: 11
+folds: 5
+repeats: 3
+deterministic: true
+output_dir: results
+
+data:
+  root: data/New_Skin_Data_1
+  train_subdir: Training
+  test_subdir: Testing
+  image_size: [224, 224]
+  batch_size: 16
+  val_fraction: 0.2
+
+model:
+  architecture: alexnet
+  dense_units: 256
+  dropout: 0.3
+  fine_tune_layers: 0
+
+train:
+  epochs: 120
+  learning_rate: 1.0e-4
+  fine_tune_learning_rate: 1.0e-5
+  early_stopping_patience: 10
+  reduce_lr_patience: 5
+  label_smoothing: 0.05
+  class_weight: true
+  augment: true
+  monitor: val_auc
+
+eval:
+  operating_point: youden
+  min_sensitivity: 0.90
+  bootstrap_samples: 2000
+
+# AlexNet has no ImageNet weights in Keras, so it starts from random init:
+# a longer schedule at a lower learning rate, and fine_tune_layers is moot.

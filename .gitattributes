@@ -1,0 +1,8 @@
+# Normalise to LF in the repository. Checkouts still get native endings, but the
+# stored blobs stay stable so a Windows contributor and a Linux CI runner do not
+# produce a whole-file diff on nothing but line endings.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.pdf binary

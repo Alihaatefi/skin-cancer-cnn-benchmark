@@ -1,0 +1,19 @@
+# Runtime pins for a full training run.
+#
+# Upper bounds are deliberate: Keras 3 moved input normalisation *inside* the
+# EfficientNet graph, so the correct preprocessing for that family differs between
+# Keras 2 and Keras 3. Pinning the major version keeps the numbers in docs/RESULTS.md
+# attached to a stack that reproduces them.
+#
+#   pip install -r requirements.txt
+#
+# CPU-only is fine for the metric layer and the tests; a GPU build of TensorFlow is
+# what makes a full seven-architecture benchmark finish in minutes rather than hours.
+
+numpy>=1.24,<3.0
+pandas>=2.0,<4.0
+scikit-learn>=1.3,<2.0
+matplotlib>=3.7,<4.0
+pyyaml>=6.0,<7.0
+pillow>=10.0,<13.0
+tensorflow>=2.16,<2.21

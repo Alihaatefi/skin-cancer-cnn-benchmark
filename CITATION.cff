@@ -1,0 +1,40 @@
+cff-version: 1.2.0
+message: "If you use this benchmark, please cite it as below."
+title: "Skin Cancer CNN Benchmark: a reproducible comparison of seven convolutional architectures for dermoscopic lesion classification"
+abstract: >-
+  A single-protocol benchmark of seven convolutional architectures (AlexNet, VGG-16,
+  VGG-19, GoogLeNet/Inception-v3, ResNet-50, DenseNet-121 and EfficientNet-B0) on
+  binary malignant/benign dermoscopic lesion classification. Every architecture is
+  trained under identical folds, seeds, augmentation and class weighting, scored with
+  threshold-free and operating-point metrics, and reported with bootstrap confidence
+  intervals, so that differences in the table are attributable to the backbone rather
+  than to the harness.
+type: software
+authors:
+  - family-names: Hatefi
+    given-names: Ali
+    email: alihatefi@aut.ac.ir
+    affiliation: "Amirkabir University of Technology"
+version: 1.0.0
+license: MIT
+repository-code: "https://github.com/Alihaatefi/skin-cancer-cnn-benchmark"
+keywords:
+  - deep learning
+  - medical image analysis
+  - dermoscopy
+  - skin cancer
+  - transfer learning
+  - reproducible research
+references:
+  - type: conference-paper
+    title: "Skin Cancer Detection using Convolutional Neural Network Models: VGG-16, VGG-19, ResNet and DenseNet"
+    authors:
+      - family-names: D
+        given-names: Surendren
+      - family-names: J
+        given-names: Sumitha
+    collection-title: "2024 5th International Conference on Data Intelligence and Cognitive Informatics (ICDICI)"
+    year: 2024
+    start: 1254
+    end: 1258
+    doi: "10.1109/ICDICI62993.2024.10810998"

@@ -1,0 +1,123 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # The fast job. It carries the tests that protect the claims most likely to be
+  # silently wrong -- label mapping, split disjointness, threshold selection, metric
+  # arithmetic -- none of which need TensorFlow, so it finishes in well under a minute.
+  test:
+    name: test (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Test
+        run: pytest -q --cov=skin_cancer_benchmark --cov-report=term-missing
+
+  # The slow job. Builds every registered backbone for real and asserts the head is
+  # wired correctly -- softmax rows summing to 1, a frozen backbone, BatchNorm still
+  # frozen under fine-tuning. It runs on one Python version because it is checking
+  # Keras behaviour, not interpreter compatibility.
+  graph:
+    name: keras graph tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install with the training backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev,train]"
+
+      - name: Build every architecture in the registry
+        env:
+          TF_CPP_MIN_LOG_LEVEL: "3"
+        run: pytest -q -m tensorflow
+
+      - name: Validate every shipped config
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from skin_cancer_benchmark.config import load_config
+
+          for path in sorted(Path("configs").glob("*.yaml")):
+              c = load_config(path)
+              print(f"{c.name:<16} {c.model.architecture:<16} {c.repeats}x{c.folds}-fold")
+          PY
+
+  # Regenerates the README figures from the committed result files. This checks that
+  # every chart is still derivable from the numbers behind it -- the figures are not
+  # byte-compared, since font availability differs per runner and would make this
+  # fail on nothing but a typeface.
+  figures:
+    name: figures rebuild from results
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+
+      - name: Render
+        run: python scripts/render_figures.py
+
+      - name: Every figure was produced
+        run: |
+          python - <<'PY'
+          import sys
+          from pathlib import Path
+
+          expected = [
+              f"{stem}{suffix}.png"
+              for stem in ("training-curves", "confusion-matrices", "operating-points")
+              for suffix in ("", "-dark")
+          ]
+          missing = [n for n in expected if not (Path("assets/figures") / n).is_file()]
+          if missing:
+              sys.exit(f"render_figures.py did not produce: {missing}")
+          print(f"all {len(expected)} figures rendered")
+          PY
