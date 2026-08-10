@@ -146,7 +146,7 @@ def train_fold(
     # head has converged -- unfreezing at the head's initial LR destroys the
     # pretrained features in the first few steps.
     if config.model.fine_tune_layers > 0 and arch.pretrained:
-        models_mod._unfreeze_top(model.layers[1], config.model.fine_tune_layers)
+        models_mod.unfreeze_top(model, config.model.fine_tune_layers)
         compile_model(
             model,
             learning_rate=config.train.fine_tune_learning_rate,

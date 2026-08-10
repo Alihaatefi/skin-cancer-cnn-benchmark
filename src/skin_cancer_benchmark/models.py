@@ -31,6 +31,10 @@ from typing import Any
 #: sensitivity to malignancy is the metric that carries clinical cost.
 POSITIVE_INDEX = 1
 
+#: The shared classification head. Named so that fine-tuning can tell head from
+#: backbone in the assembled model, where the two are one flat list of layers.
+HEAD_LAYER_NAMES = frozenset({"head_pool", "head_dropout", "head_dense", "predictions"})
+
 
 @dataclass(frozen=True)
 class Architecture:
@@ -169,41 +173,57 @@ def build_model(
 
     if not arch.pretrained:
         backbone = _build_alexnet(input_shape)
-        features = backbone.output
     else:
         application = getattr(keras.applications, arch.application)
         backbone = application(
             weights="imagenet", include_top=False, input_shape=input_shape
         )
-        backbone.trainable = False
-        if fine_tune_layers > 0:
-            _unfreeze_top(backbone, fine_tune_layers)
-        features = backbone.output
+    backbone.trainable = False
 
-    x = layers.GlobalAveragePooling2D(name="head_pool")(features)
+    x = layers.GlobalAveragePooling2D(name="head_pool")(backbone.output)
     if dropout > 0:
         x = layers.Dropout(dropout, name="head_dropout")(x)
     x = layers.Dense(dense_units, activation="relu", name="head_dense")(x)
     outputs = layers.Dense(2, activation="softmax", name="predictions")(x)
 
-    return keras.Model(inputs=backbone.input, outputs=outputs, name=f"{arch.key}_classifier")
+    model = keras.Model(
+        inputs=backbone.input, outputs=outputs, name=f"{arch.key}_classifier"
+    )
+    if fine_tune_layers > 0:
+        unfreeze_top(model, fine_tune_layers)
+    return model
 
 
-def _unfreeze_top(backbone, count: int) -> None:
-    """Unfreeze the top ``count`` layers, leaving BatchNorm frozen throughout.
+def unfreeze_top(model, count: int) -> list[str]:
+    """Unfreeze the top ``count`` backbone layers of an assembled classifier.
 
-    Un-freezing BatchNorm on a batch of 16 lets its running statistics drift toward
-    noise, which is a well-known way to make fine-tuning look worse than the frozen
-    baseline for reasons unrelated to the backbone.
+    Takes the *assembled* model, not a separate backbone object. Building the
+    classifier with the functional API on ``backbone.output`` inlines the backbone's
+    layers into the new graph rather than nesting it, so after :func:`build_model`
+    there is no backbone sub-model left to hand around -- ``model.layers`` is the
+    flat list of the backbone's own layers followed by the head's.
+
+    Head layers are excluded by name and stay trainable throughout; BatchNorm is held
+    frozen everywhere, because updating its running statistics on a batch of 16 lets
+    them drift toward noise and makes fine-tuning look worse than the frozen baseline
+    for reasons that have nothing to do with the backbone.
+
+    Returns the names of the layers it unfroze, so a caller can log what moved.
     """
     from keras import layers
 
-    backbone.trainable = True
-    for layer in backbone.layers[:-count]:
-        layer.trainable = False
-    for layer in backbone.layers:
+    backbone_layers = [layer for layer in model.layers if layer.name not in HEAD_LAYER_NAMES]
+    unfrozen: list[str] = []
+    for layer in backbone_layers[-count:]:
+        if isinstance(layer, layers.BatchNormalization):
+            continue
+        layer.trainable = True
+        unfrozen.append(layer.name)
+
+    for layer in model.layers:
         if isinstance(layer, layers.BatchNormalization):
             layer.trainable = False
+    return unfrozen
 
 
 def _build_alexnet(input_shape: tuple[int, int, int]):
@@ -238,8 +258,16 @@ def _build_alexnet(input_shape: tuple[int, int, int]):
 
 
 def last_conv_layer_name(model) -> str:
-    """Name of the deepest 4-D activation, used as the Grad-CAM target."""
+    """Name of the deepest 4-D activation, used as the Grad-CAM target.
+
+    Head layers are skipped explicitly: pooling collapses the spatial dimensions, so
+    the last 4-D tensor is by definition the top of the backbone, but being explicit
+    keeps this correct if the head ever grows a spatial layer of its own.
+    """
     for layer in reversed(model.layers):
-        if len(getattr(layer, "output_shape", getattr(layer, "output", None).shape)) == 4:
+        if layer.name in HEAD_LAYER_NAMES:
+            continue
+        shape = getattr(getattr(layer, "output", None), "shape", None)
+        if shape is not None and len(shape) == 4:
             return layer.name
     raise ValueError(f"{model.name} has no 4-D activation to attach Grad-CAM to")

@@ -146,20 +146,24 @@ src/skin_cancer_benchmark/
 └── seeding.py     seed control, determinism, run provenance
 
 configs/           one YAML per architecture; only `model` differs between them
-tests/             82 tests, 78 of which need no TensorFlow
+tests/             85 tests, 78 of which need no TensorFlow
 scripts/           dataset download, figure rendering
 docs/              methodology, results, reproducibility, limitations
 ```
 
-**Tests.** 82 in total. The layers carrying the claims most likely to be silently
+**Tests.** 85 in total. The layers carrying the claims most likely to be silently
 wrong — label mapping, split disjointness, threshold selection, metric arithmetic —
-are pure NumPy/pandas and run everywhere in about six seconds; only the four
-Keras-graph tests need TensorFlow. Among them:
+are pure NumPy/pandas and run everywhere in about six seconds; the seven Keras-graph
+tests build every registered backbone for real. Among them:
 
 - `malignant` is index 1 regardless of how the source folders are spelled — otherwise
   sensitivity and specificity silently swap between two copies of the same dataset
 - no image appears on both sides of any split, across all folds
 - every architecture declares its own preprocessing, and no two families share one
+- the backbone is inlined rather than nested by the functional API, which is the
+  assumption every fine-tuning path depends on
+- fine-tuning moves only the top of the backbone, never the bottom, and never
+  BatchNorm
 - all seven configs are identical outside their `model` section — the benchmark's
   central claim, asserted rather than promised
 

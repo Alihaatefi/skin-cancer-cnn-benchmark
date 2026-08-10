@@ -26,7 +26,7 @@ version first, then `pip install -e ".[dev]"` to avoid overwriting it.
 Verify:
 
 ```bash
-pytest -q                      # 82 tests; graph tests skip without TensorFlow
+pytest -q                      # 85 tests; graph tests skip without TensorFlow
 python -c "import tensorflow as tf; print(tf.config.list_physical_devices('GPU'))"
 ```
 

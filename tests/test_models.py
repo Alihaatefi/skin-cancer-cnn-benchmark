@@ -78,7 +78,34 @@ class TestBuildModel:
     def test_backbone_is_frozen_by_default(self):
         model = models.build_model("efficientnetb0", input_shape=(96, 96, 3))
         trainable = {layer.name for layer in model.layers if layer.trainable}
-        assert trainable <= {"head_pool", "head_dropout", "head_dense", "predictions"}
+        assert trainable <= set(models.HEAD_LAYER_NAMES)
+
+    def test_the_backbone_is_inlined_not_nested(self):
+        """The assumption every fine-tuning path depends on.
+
+        Building on ``backbone.output`` inlines the backbone into the new graph, so
+        ``model.layers`` is a flat list of conv layers -- there is no backbone
+        sub-model at ``model.layers[1]`` to reach for.
+        """
+        from keras import Model
+
+        model = models.build_model("efficientnetb0", input_shape=(96, 96, 3))
+        nested = [ly for ly in model.layers if isinstance(ly, Model)]
+
+        assert not nested, "backbone is nested; unfreeze_top's layer scan is wrong"
+        assert len(model.layers) > 50
+
+    def test_fine_tuning_unfreezes_only_the_top_of_the_backbone(self):
+        model = models.build_model("efficientnetb0", input_shape=(96, 96, 3))
+        depth = len([ly for ly in model.layers if ly.name not in models.HEAD_LAYER_NAMES])
+
+        unfrozen = models.unfreeze_top(model, 20)
+
+        assert 0 < len(unfrozen) <= 20
+        # The bottom of the backbone must not move: those features are the reason
+        # for using pretrained weights at all.
+        bottom = [ly for ly in model.layers[: depth - 20] if ly.trainable]
+        assert not bottom
 
     def test_fine_tuning_keeps_batchnorm_frozen(self):
         from keras import layers
@@ -88,6 +115,13 @@ class TestBuildModel:
         )
         norms = [ly for ly in model.layers if isinstance(ly, layers.BatchNormalization)]
         assert norms and not any(ly.trainable for ly in norms)
+
+    def test_fine_tuning_leaves_the_head_trainable(self):
+        model = models.build_model(
+            "efficientnetb0", input_shape=(96, 96, 3), fine_tune_layers=20
+        )
+        head = [ly for ly in model.layers if ly.name in models.HEAD_LAYER_NAMES]
+        assert head and all(ly.trainable for ly in head)
 
 
 class TestBenchmarkTable:

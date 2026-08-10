@@ -64,7 +64,7 @@ def compute_heatmap(
 
 def overlay(image_rgb: np.ndarray, heatmap: np.ndarray, *, alpha: float = 0.45) -> np.ndarray:
     """Blend a heatmap over the original RGB image, returned as uint8."""
-    import matplotlib.cm as cm
+    import matplotlib
     from PIL import Image
 
     resized = np.asarray(
@@ -73,7 +73,8 @@ def overlay(image_rgb: np.ndarray, heatmap: np.ndarray, *, alpha: float = 0.45) 
         )
     ) / 255.0
 
-    coloured = cm.get_cmap("inferno")(resized)[..., :3]
+    # matplotlib.colormaps, not cm.get_cmap -- the latter was removed in 3.9.
+    coloured = matplotlib.colormaps["inferno"](resized)[..., :3]
     blended = (1 - alpha) * (image_rgb / 255.0) + alpha * coloured
     return (np.clip(blended, 0, 1) * 255).astype(np.uint8)
 
@@ -102,8 +103,15 @@ def explain_paths(
         batch = preprocess(tf.cast(resized, tf.float32)[None, ...])
         heatmap, class_index, confidence = compute_heatmap(model, batch)
 
+        # The source class folder is part of the name: the dataset numbers its files
+        # per class, so two inputs can share a stem and would otherwise overwrite
+        # each other whenever the model predicted the same label at the same
+        # confidence -- silently dropping exactly the disagreements worth looking at.
+        source = Path(path)
         label = ("benign", "malignant")[class_index]
-        destination = output_dir / f"{Path(path).stem}_{label}_{confidence:.2f}.png"
+        destination = (
+            output_dir / f"{source.parent.name}_{source.stem}_pred-{label}_{confidence:.2f}.png"
+        )
         Image.fromarray(overlay(rgb, heatmap)).save(destination)
         written.append(destination)
 
