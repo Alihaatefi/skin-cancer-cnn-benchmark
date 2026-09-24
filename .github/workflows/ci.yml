@@ -113,7 +113,8 @@ jobs:
 
           expected = [
               f"{stem}{suffix}.png"
-              for stem in ("training-curves", "confusion-matrices", "operating-points")
+              for stem in ("training-curves", "confusion-matrices", "operating-points",
+                           "full-benchmark")
               for suffix in ("", "-dark")
           ]
           missing = [n for n in expected if not (Path("assets/figures") / n).is_file()]

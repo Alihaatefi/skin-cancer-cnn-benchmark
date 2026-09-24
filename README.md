@@ -30,50 +30,61 @@ It is a research and teaching benchmark. **It is not a medical device** — see
 
 ## Results
 
-A single-split baseline across three architectures has been measured. Full protocol
-and figures in [RESULTS.md](docs/RESULTS.md).
+**Full benchmark, measured 2026-09-24.** Seven architectures, 15 runs each (3 seeds ×
+stratified 5-fold cross-validation on the 84 training images), every run scored once
+on the same 204 held-out test images (162 benign, 42 malignant). `mean ± std` over the
+15 runs; the complete table, bootstrap intervals and run record are in
+[RESULTS.md](docs/RESULTS.md#full-benchmark).
 
-**84 training / 204 test images (162 benign, 42 malignant).** Pretrained backbones
-frozen, Adam, batch 16, 30 epochs; AlexNet from random init for 100.
-
-| Model | Year | Accuracy | Balanced acc. | Sensitivity | Specificity | MCC |
+| Model | Year | ROC-AUC | Balanced acc. | Sensitivity | Specificity | MCC |
 |---|---:|---:|---:|---:|---:|---:|
-| AlexNet | 2012 | 58.3% | 0.561 | 0.524 | 0.599 | 0.100 |
-| GoogLeNet (Inception-v3) | 2014 | 65.7% | 0.775 | **0.976** | 0.574 | 0.446 |
-| **EfficientNet-B0** | 2019 | **82.4%** | **0.792** | 0.738 | **0.846** | **0.529** |
+| AlexNet (random init) | 2012 | 0.545 ± 0.092 | 0.525 ± 0.064 | 0.446 ± 0.229 | 0.603 ± 0.278 | 0.057 ± 0.124 |
+| GoogLeNet (Inception-v3) | 2014 | 0.827 ± 0.023 | 0.756 ± 0.015 | 0.687 ± 0.071 | 0.826 ± 0.074 | 0.472 ± 0.052 |
+| VGG-16 | 2014 | 0.868 ± 0.028 | 0.774 ± 0.042 | 0.752 ± 0.155 | 0.795 ± 0.092 | 0.487 ± 0.047 |
+| VGG-19 | 2014 | 0.877 ± 0.030 | 0.767 ± 0.051 | 0.722 ± 0.174 | 0.812 ± 0.089 | 0.487 ± 0.050 |
+| ResNet-50 | 2015 | 0.937 ± 0.008 | 0.845 ± 0.029 | 0.800 ± 0.103 | 0.890 ± 0.080 | 0.661 ± 0.068 |
+| DenseNet-121 | 2017 | 0.909 ± 0.017 | 0.813 ± 0.038 | 0.802 ± 0.140 | 0.824 ± 0.083 | 0.565 ± 0.040 |
+| EfficientNet-B0 | 2019 | 0.882 ± 0.023 | 0.774 ± 0.034 | 0.690 ± 0.146 | 0.857 ± 0.109 | 0.536 ± 0.067 |
+
+For reference, a model that answers "benign" for every test image scores ROC-AUC
+0.500, balanced accuracy 0.500, sensitivity 0, specificity 1, MCC 0 — and 79.4%
+accuracy.
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/figures/operating-points-dark.png">
-  <img alt="Sensitivity and specificity per model, shown as paired dots. GoogLeNet reaches 0.98 sensitivity but only 0.57 specificity; EfficientNet-B0 is balanced at 0.74 and 0.85; AlexNet sits near 0.52 and 0.60." src="assets/figures/operating-points.png">
+  <source media="(prefers-color-scheme: dark)" srcset="assets/figures/full-benchmark-dark.png">
+  <img alt="Mean plus or minus one standard deviation over 15 runs for each of seven models on ROC-AUC, balanced accuracy and MCC, with a dashed line at the always-benign value. The six pretrained backbones sit well to the right of the line (ROC-AUC 0.83 to 0.94); AlexNet's whisker crosses it on all three metrics." src="assets/figures/full-benchmark.png">
 </picture>
 
-**Three findings, and the third is the one that shaped the design of this repository:**
+**What the numbers support, and what they do not.** A difference is claimed only when
+neither the run-to-run spread nor the bootstrap 95% interval over test images overlaps
+([how](docs/RESULTS.md#against-a-model-that-does-nothing)).
 
-**1. Pretraining, not architecture, is what the dataset can support.** AlexNet reaches
-MCC 0.10 against a chance baseline of 0.0 — barely better than guessing. Its row marks
-how much of every other row comes from ImageNet weights rather than from architectural
-merit.
+**1. Every ImageNet-pretrained backbone outperforms answering "benign" every time;
+AlexNet does not.** All six clear the always-benign reference on ROC-AUC, balanced
+accuracy and MCC. AlexNet, trained from random initialisation, overlaps it on all
+three — on 84 images it is indistinguishable from a model that ignores the image. It is
+also the only model without pretraining, so its row measures what ImageNet weights
+contribute, not an architectural verdict.
 
-**2. EfficientNet-B0 is the best-balanced model, and the cheapest.** Highest balanced
-accuracy and MCC, and the fastest to train of the three despite being the newest.
+**2. The six pretrained backbones cannot be ranked by this experiment.** ResNet-50 has
+the highest mean on ROC-AUC, balanced accuracy, specificity and MCC, but its bootstrap
+interval overlaps every other pretrained backbone's on every metric. With 42 malignant
+test images, the test set cannot confirm the ordering.
 
-**3. Accuracy ranks these models wrong, so the benchmark does not use it as the
-headline.** A model that answers "benign" for all 204 test images scores **79.4%** —
-beating two of the three rows above while catching zero cancers. And the two leading
-models fail in opposite directions: GoogLeNet catches 41 of 42 malignant lesions but
-flags 69 healthy ones, while EfficientNet clears benign cases far better and misses
-11 malignancies. Which error profile is preferable is a deployment question, not an
-accuracy question — so every model here is reported on sensitivity, specificity,
-balanced accuracy, MCC and ROC-AUC, at an operating point chosen on validation data
-and never on test.
+**3. Accuracy would have told a different story, which is why it is not the headline.**
+Only ResNet-50's accuracy (0.872 ± 0.047) is separated from the 79.4% of always-benign.
+GoogLeNet (Inception-v3) averages 79.7% accuracy — level with doing nothing — while
+ranking lesions at ROC-AUC 0.827. Every model is therefore reported on ROC-AUC,
+sensitivity, specificity, balanced accuracy and MCC, at an operating point chosen on
+validation data and never on test.
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/figures/confusion-matrices-dark.png">
-  <img alt="Confusion matrices for the three models on 204 test images. AlexNet 97/65/20/22, GoogLeNet 93/69/1/41, EfficientNet-B0 137/25/11/31." src="assets/figures/confusion-matrices.png">
-</picture>
+**4. Where a rerun was checked, it reproduced bit for bit.** Four architectures
+completed in two separate full runs and produced identical results both times. The
+full benchmark took 1 h 57 min on one RTX 4060 Ti.
 
-The full seven-architecture benchmark is implemented and tested; running it needs the
-dataset locally and 3–5 GPU-hours. See [RESULTS.md](docs/RESULTS.md#full-benchmark).
+An earlier single-split baseline (three architectures, frozen backbones, argmax
+threshold) is kept in [RESULTS.md](docs/RESULTS.md#baseline-run) with its own figures.
+It used a different protocol, so its numbers are not comparable to the table above.
 
 ## Method
 
@@ -172,7 +183,7 @@ tests build every registered backbone for real. Among them:
 | | |
 |---|---|
 | [METHODOLOGY.md](docs/METHODOLOGY.md) | Task, splits, training protocol, metric choices |
-| [RESULTS.md](docs/RESULTS.md) | Measured results, figures, full-benchmark spec |
+| [RESULTS.md](docs/RESULTS.md) | Full-benchmark results, intervals and run record; the earlier baseline |
 | [REPRODUCIBILITY.md](docs/REPRODUCIBILITY.md) | Environment, data, runtime cost, determinism |
 | [LIMITATIONS.md](docs/LIMITATIONS.md) | **What this does not establish** |
 
