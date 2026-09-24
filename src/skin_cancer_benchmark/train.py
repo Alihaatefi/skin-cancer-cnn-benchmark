@@ -304,11 +304,24 @@ def _release(model) -> None:
     Without this, k folds of a 22M-parameter backbone accumulate in one session and
     the later folds OOM on a laptop GPU -- which looks like a fold-dependent failure
     and is really just a leak.
+
+    ``clear_session`` alone is not enough. TensorFlow's global gradient registry keeps
+    a ``CustomGradient-*`` entry for every custom gradient traced into a train step
+    (Keras 3's Adam update registers some), each entry's closure holds that step's
+    graph, and the graph's captures hold every variable of the fold's model. Nothing
+    ever unregisters them, so on TF 2.20 / Keras 3.15 each fold pinned its whole model
+    and optimizer state on the GPU until ResNet-50 ran out of memory partway through
+    a seven-architecture benchmark. The entries belong to graphs that are never run
+    again once their model is gone, so dropping them changes no computation.
     """
     import gc
 
     import keras
+    from tensorflow.python.framework import ops
 
     del model
     keras.backend.clear_session()
+    registry = getattr(ops.gradient_registry, "_registry", {})
+    for key in [k for k in registry if k.startswith("CustomGradient-")]:
+        del registry[key]
     gc.collect()
