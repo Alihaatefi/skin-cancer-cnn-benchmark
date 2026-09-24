@@ -1,7 +1,8 @@
-"""Render the README figures from the recorded baseline-run artefacts.
+"""Render the README figures from the recorded result files.
 
 Figures are generated rather than pasted so they stay attached to the numbers in
-``results/baseline_run/``: change a matrix, re-run this, and the chart follows.
+``results/baseline_run/`` and ``results/benchmark.csv``: change a matrix or re-run the
+benchmark, re-run this, and the chart follows.
 Each figure is written twice, for light and dark viewers, and the README selects
 between them with a ``<picture>`` element.
 
@@ -14,6 +15,7 @@ wherever two series fit, and recessive grid lines.
 
 from __future__ import annotations
 
+import csv
 import json
 from dataclasses import dataclass
 from pathlib import Path
@@ -29,7 +31,11 @@ from skin_cancer_benchmark.metrics import operating_point_metrics  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 RESULTS = ROOT / "results" / "baseline_run"
+BENCHMARK = ROOT / "results" / "benchmark.csv"
 ASSETS = ROOT / "assets" / "figures"
+
+#: The test split every model is scored on: 42 malignant, 162 benign.
+TEST_POSITIVES, TEST_NEGATIVES = 42, 162
 
 MODEL_ORDER = ("alexnet", "inceptionv3", "efficientnetb0")
 
@@ -344,6 +350,82 @@ def figure_operating_points(matrices: dict, theme: Theme) -> Path:
     return _save(fig, f"operating-points{theme.suffix}.png")
 
 
+def always_benign() -> dict[str, float]:
+    """The trivial reference: every test image called benign, via the package's own code.
+
+    Its scores are a constant, which ranks nothing, so its ROC-AUC is 0.5 by definition.
+    """
+    y_true = np.array([1] * TEST_POSITIVES + [0] * TEST_NEGATIVES)
+    scores = operating_point_metrics(y_true, np.zeros_like(y_true))
+    scores["roc_auc"] = 0.5
+    return scores
+
+
+def figure_full_benchmark(rows: list[dict[str, str]], theme: Theme) -> Path:
+    """Fold mean +/- std per model on three headline metrics, against always-benign.
+
+    Small multiples share the model rows, one metric per panel and one scale per axis.
+    The dashed line is what a model that never flags anything scores, so a whisker
+    that reaches it is a model this experiment cannot tell apart from doing nothing
+    on that metric.
+    """
+    apply_theme(theme)
+    panels = (("roc_auc", "ROC-AUC"), ("balanced_accuracy", "Balanced accuracy"), ("mcc", "MCC"))
+    reference = always_benign()
+    ordered = list(reversed(rows))  # table order (by year) reads top to bottom
+    positions = np.arange(len(ordered))
+
+    fig, axes = plt.subplots(1, len(panels), figsize=(10.5, 4.2), sharey=True)
+    for ax, (key, label) in zip(axes, panels, strict=True):
+        means = np.array([float(r[key]) for r in ordered])
+        stds = np.array([float(r[f"{key}_std"]) for r in ordered])
+
+        ax.axvline(reference[key], color=theme.muted, linewidth=1.2, linestyle=(0, (4, 3)),
+                   zorder=1)
+        ax.hlines(positions, means - stds, means + stds, color=theme.series[0], linewidth=2,
+                  zorder=2)
+        ax.scatter(means, positions, s=64, color=theme.series[0], edgecolor=theme.surface,
+                   linewidth=2, zorder=3)
+        for y, mean, std in zip(positions, means, stds, strict=True):
+            ax.annotate(f"{mean:.2f}", xy=(mean + std, y), xytext=(5, 0),
+                        textcoords="offset points", va="center", color=theme.ink_secondary,
+                        fontsize=8)
+
+        low = min(reference[key], float(np.min(means - stds)))
+        high = float(np.max(means + stds))
+        pad = 0.08 * (high - low)
+        ax.set_xlim(low - pad, high + 2.2 * pad)
+        ax.set_title(label, color=theme.ink, loc="left", pad=8)
+        ax.grid(True, axis="x")
+        ax.grid(False, axis="y")
+        ax.tick_params(axis="y", length=0)
+        # The reference label gets its own band above the top row, clear of any whisker.
+        ax.annotate(f"always benign ({reference[key]:.1f})",
+                    xy=(reference[key], len(ordered) - 0.5), xytext=(4, 0),
+                    textcoords="offset points", ha="left", va="bottom", color=theme.muted,
+                    fontsize=7.5)
+
+    axes[0].set_yticks(positions, [r["display_name"] for r in ordered])
+    axes[0].set_ylim(-0.6, len(ordered) + 0.1)
+    fig.suptitle(
+        "Full benchmark: 15 runs per model (3 seeds x 5 folds), scored on the same 204 test images",
+        color=theme.ink, fontsize=12, fontweight="bold", x=0.01, ha="left", y=0.99,
+    )
+    fig.text(
+        0.01, 0.005,
+        "Dot: mean over the 15 runs. Whisker: +/- 1 standard deviation across runs. "
+        "Dashed line: a model that calls every image benign.",
+        color=theme.muted, fontsize=8, ha="left",
+    )
+    fig.tight_layout(rect=(0, 0.03, 1, 0.97))
+    return _save(fig, f"full-benchmark{theme.suffix}.png")
+
+
+def load_benchmark() -> list[dict[str, str]]:
+    with BENCHMARK.open(encoding="utf-8", newline="") as handle:
+        return list(csv.DictReader(handle))
+
+
 def _save(fig, filename: str) -> Path:
     ASSETS.mkdir(parents=True, exist_ok=True)
     path = ASSETS / filename
@@ -355,10 +437,12 @@ def _save(fig, filename: str) -> Path:
 
 def main() -> int:
     matrices, history = load()
+    benchmark = load_benchmark()
     for theme in (LIGHT, DARK):
         figure_training_curves(history, matrices, theme)
         figure_confusion(matrices, theme)
         figure_operating_points(matrices, theme)
+        figure_full_benchmark(benchmark, theme)
     return 0
 
 

@@ -23,13 +23,15 @@ reported table while every line of code stays the same.
 
 | | Images | Benign | Malignant | Prevalence |
 |---|---:|---:|---:|---:|
-| Training | 84 | — | — | — |
+| Training | 84 | 42 | 42 | 50.0% |
 | Test | 204 | 162 | 42 | 20.6% |
 
-The per-class training counts are printed by `skin-benchmark inspect --config <cfg>`
-against your own copy of the data; they are left blank here rather than quoted from
-memory, since the class balance of the training directory is the one number that
-changes what `class_weight` does.
+Counts as printed by `skin-benchmark inspect --config <cfg>` against the Kaggle copy
+used for the measured run (2026-09-24). Check them against your own copy: the class
+balance of the training directory is the one number that changes what `class_weight`
+does. In this copy the training split is balanced, so the inverse-frequency weights
+both come out at 1.0 and class weighting has no effect; only the test split is
+imbalanced.
 
 Source: [Skin Cancer Image Classification](https://www.kaggle.com/datasets/veerendratelaprolu/skin-cancer-image-classification)
 (Kaggle, public). Images are not redistributed here; `scripts/download_dataset.py`
@@ -48,13 +50,13 @@ that results remain comparable to other work using the same source, but it means
 *training* side is the binding constraint on what can be learned, while the test side
 is comparatively well-powered.
 
-**It is imbalanced, 4:1 toward benign.** This is what makes accuracy an actively
-misleading metric here — see §5.
+**Its test split is imbalanced, 4:1 toward benign** (the training split is balanced).
+This is what makes accuracy an actively misleading metric here — see §5.
 
 ## 3. Splitting
 
 ```
-Training/ (84) ─── stratified 5-fold ──▶ 5 × (fit 67, validate 17)
+Training/ (84) ─── stratified 5-fold ──▶ 5 × (fit 67–68, validate 16–17)
                                                     │
                                     early stopping, LR schedule,
                                     checkpoint selection, threshold
@@ -91,7 +93,7 @@ difference. Defined in [`configs/`](../configs), one file per model.
 | Optimiser | Adam, 1e-3 (head) / 1e-5 (fine-tune) |
 | Batch size | 16 |
 | Epochs | 60 max, early stopping on `val_auc`, patience 10 |
-| Class weights | Inverse frequency, normalised to mean 1.0 |
+| Class weights | Inverse frequency, normalised to mean 1.0 (1.0 / 1.0 on the balanced training split) |
 | Augmentation | Flips, ±15° rotation, ±15% zoom, ±10% translation |
 
 **Preprocessing travels with the architecture.** This is the single most important

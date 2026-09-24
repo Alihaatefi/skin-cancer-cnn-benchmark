@@ -12,12 +12,20 @@ data/
 *.keras
 *.npy
 
-# Run outputs. results/baseline_run/ is the one committed exception: it holds the
-# recorded numbers the README figures are rendered from, so it must stay in git.
-# These rules come last so they win over the artefact patterns above.
+# Run outputs. Committed exceptions: results/baseline_run/ (the recorded baseline the
+# README figures were first rendered from), the full-benchmark table
+# (results/benchmark.{md,csv}, which scripts/render_figures.py reads), the environment
+# captured at launch, and each architecture's results.json (per-fold scorecards,
+# histories and run manifest). Weights and .npy score dumps inside those directories
+# stay ignored by the artefact patterns above. These rules come last so they win.
 results/*
 !results/baseline_run/
 !results/baseline_run/**
+!results/benchmark.md
+!results/benchmark.csv
+!results/benchmark_environment.txt
+!results/*/
+!results/*/results.json
 
 # Python
 __pycache__/

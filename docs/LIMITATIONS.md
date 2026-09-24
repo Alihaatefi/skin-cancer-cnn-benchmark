@@ -26,7 +26,10 @@ from imaging alone.
 **84 training images.** This is the binding constraint on everything. Cross-validation
 and repeated seeds make the uncertainty *visible*; they do not make it small. Expect
 fold-to-fold standard deviations of several percentage points, and treat any two
-models whose intervals overlap as unseparated by this experiment.
+models whose intervals overlap as unseparated by this experiment. In the measured run
+the run-to-run standard deviation of sensitivity was 7–17 points for the pretrained
+backbones, and no two pretrained backbones were separated on any metric
+([RESULTS.md](RESULTS.md#reading-the-table)).
 
 **204 test images means coarse resolution.** One image is roughly half a percentage
 point of accuracy, and roughly 2.4 points of sensitivity (there are only 42 malignant
